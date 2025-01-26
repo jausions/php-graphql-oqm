@@ -909,12 +909,12 @@ class TransparentSchemaClassGenerator extends SchemaClassGenerator
         parent::__construct($client, $writeDir, 'GraphQL\\Tests\\SchemaObject');
     }
 
-    public function generateRootQueryObject(): bool
+    public function generateRootQueryObject(int $typeOfTypeDepth = 4): bool
     {
         return parent::generateRootQueryObject();
     }
 
-    public function generateQueryObject(string $objectName): bool
+    public function generateQueryObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         return parent::generateQueryObject($objectName);
     }
@@ -924,17 +924,17 @@ class TransparentSchemaClassGenerator extends SchemaClassGenerator
         return parent::generateEnumObject($objectName);
     }
 
-    public function generateInputObject(string $objectName): bool
+    public function generateInputObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         return parent::generateInputObject($objectName);
     }
 
-    public function generateObject(string $objectName, string $objectKind): bool
+    public function generateObject(string $objectName, string $objectKind, int $typeOfTypeDepth = 4): bool
     {
         return parent::generateObject($objectName, $objectKind);
     }
 
-    public function generateArgumentsObject(string $argsObjectName, array $arguments): bool
+    public function generateArgumentsObject(string $argsObjectName, array $arguments, int $typeOfTypeDepth = 4): bool
     {
         return parent::generateArgumentsObject($argsObjectName, $arguments);
     }
@@ -944,7 +944,7 @@ class TransparentSchemaClassGenerator extends SchemaClassGenerator
         return parent::getTypeInfo($dataArray);
     }
 
-    public function generateUnionObject(string $objectName): bool
+    public function generateUnionObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         return parent::generateUnionObject($objectName);
     }

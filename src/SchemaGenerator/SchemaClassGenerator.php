@@ -10,6 +10,7 @@ use GraphQL\SchemaGenerator\CodeGenerator\InputObjectClassBuilder;
 use GraphQL\SchemaGenerator\CodeGenerator\ObjectBuilderInterface;
 use GraphQL\SchemaGenerator\CodeGenerator\QueryObjectClassBuilder;
 use GraphQL\SchemaGenerator\CodeGenerator\UnionObjectBuilder;
+use GraphQL\SchemaGenerator\SchemaInspector\TypeSubQueryGenerator;
 use GraphQL\SchemaObject\QueryObject;
 use GraphQL\Util\StringLiteralFormatter;
 use RuntimeException;
@@ -55,7 +56,7 @@ class SchemaClassGenerator
      */
 	public function __construct(Client $client, string $writeDir = '', string $namespace = ObjectBuilderInterface::DEFAULT_NAMESPACE)
     {
-        $this->schemaInspector     = new SchemaInspector($client);
+        $this->schemaInspector     = new SchemaInspector($client, new TypeSubQueryGenerator());
         $this->generatedObjects    = [];
         $this->writeDir            = $writeDir;
         $this->generationNamespace = $namespace;
@@ -63,11 +64,13 @@ class SchemaClassGenerator
     }
 
     /**
+     * @param int $typeOfTypeDepth
+     *
      * @return bool
      */
-	public function generateRootQueryObject(): bool
+	public function generateRootQueryObject(int $typeOfTypeDepth = 4): bool
 	{
-	    $objectArray    = $this->schemaInspector->getQueryTypeSchema();
+	    $objectArray    = $this->schemaInspector->getQueryTypeSchema($typeOfTypeDepth);
         $rootObjectName = QueryObject::ROOT_QUERY_OBJECT_NAME;
         $queryTypeName  = $objectArray['name'];
         //$rootObjectDescr = $objectArray['description'];
@@ -79,7 +82,7 @@ class SchemaClassGenerator
         $this->generatedObjects[$queryTypeName] = true;
 
         $queryObjectBuilder = new QueryObjectClassBuilder($this->writeDir, $rootObjectName, $this->generationNamespace);
-        $this->appendQueryObjectFields($queryObjectBuilder, $rootObjectName, $objectArray['fields']);
+        $this->appendQueryObjectFields($queryObjectBuilder, $rootObjectName, $objectArray['fields'], $typeOfTypeDepth);
         $queryObjectBuilder->build();
 
         return true;
@@ -91,8 +94,9 @@ class SchemaClassGenerator
      * @param QueryObjectClassBuilder $queryObjectBuilder
      * @param string                  $currentTypeName
      * @param array                   $fieldsArray
+     * @param int                     $typeOfTypeDepth
      */
-	private function appendQueryObjectFields(QueryObjectClassBuilder $queryObjectBuilder, string $currentTypeName, array $fieldsArray)
+	private function appendQueryObjectFields(QueryObjectClassBuilder $queryObjectBuilder, string $currentTypeName, array $fieldsArray, int $typeOfTypeDepth = 4): void
     {
         foreach ($fieldsArray as $fieldArray) {
             $name = $fieldArray['name'];
@@ -110,7 +114,7 @@ class SchemaClassGenerator
             } else {
 
                 // Generate nested type object if it wasn't generated
-                $objectGenerated = $this->generateObject($typeName, $typeKind);
+                $objectGenerated = $this->generateObject($typeName, $typeKind, $typeOfTypeDepth);
                 if ($objectGenerated) {
 
                     // Generate nested type arguments object if it wasn't generated
@@ -129,20 +133,21 @@ class SchemaClassGenerator
     /**
      * @param string $objectName
      * @param string $objectKind
+     * @param int    $typeOfTypeDepth
      *
      * @return bool
      */
-    protected function generateObject(string $objectName, string $objectKind): bool
+    protected function generateObject(string $objectName, string $objectKind, int $typeOfTypeDepth = 4): bool
     {
         switch ($objectKind) {
             case FieldTypeKindEnum::OBJECT:
-                return $this->generateQueryObject($objectName);
+                return $this->generateQueryObject($objectName, $typeOfTypeDepth);
             case FieldTypeKindEnum::INPUT_OBJECT:
-                return $this->generateInputObject($objectName);
+                return $this->generateInputObject($objectName, $typeOfTypeDepth);
             case FieldTypeKindEnum::ENUM_OBJECT:
                 return $this->generateEnumObject($objectName);
             case FieldTypeKindEnum::UNION_OBJECT:
-                return $this->generateUnionObject($objectName);
+                return $this->generateUnionObject($objectName, $typeOfTypeDepth);
             default:
                 print "Couldn't generate type $objectName: generating $objectKind kind is not supported yet" . PHP_EOL;
                 return false;
@@ -151,21 +156,22 @@ class SchemaClassGenerator
 
     /**
      * @param string $objectName
+     * @param int    $typeOfTypeDepth
      *
      * @return bool
      */
-    protected function generateQueryObject(string $objectName): bool
+    protected function generateQueryObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         if (array_key_exists($objectName, $this->generatedObjects)) {
             return true;
         }
 
         $this->generatedObjects[$objectName] = true;
-        $objectArray   = $this->schemaInspector->getObjectSchema($objectName);
+        $objectArray   = $this->schemaInspector->getObjectSchema($objectName, $typeOfTypeDepth);
         $objectName    = $objectArray['name'];
         $objectBuilder = new QueryObjectClassBuilder($this->writeDir, $objectName, $this->generationNamespace);
 
-        $this->appendQueryObjectFields($objectBuilder, $objectName, $objectArray['fields']);
+        $this->appendQueryObjectFields($objectBuilder, $objectName, $objectArray['fields'], $typeOfTypeDepth);
         $objectBuilder->build();
 
         return true;
@@ -173,17 +179,18 @@ class SchemaClassGenerator
 
     /**
      * @param string $objectName
+     * @param int    $typeOfTypeDepth
      *
      * @return bool
      */
-    protected function generateInputObject(string $objectName): bool
+    protected function generateInputObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         if (array_key_exists($objectName, $this->generatedObjects)) {
             return true;
         }
 
         $this->generatedObjects[$objectName] = true;
-        $objectArray   = $this->schemaInspector->getInputObjectSchema($objectName);
+        $objectArray   = $this->schemaInspector->getInputObjectSchema($objectName, $typeOfTypeDepth);
         $objectName    = $objectArray['name'];
         $objectBuilder = new InputObjectClassBuilder($this->writeDir, $objectName, $this->generationNamespace);
 
@@ -195,7 +202,7 @@ class SchemaClassGenerator
 
             $objectGenerated = true;
             if ($typeKind !== FieldTypeKindEnum::SCALAR) {
-                $objectGenerated = $this->generateObject($typeName, $typeKind);
+                $objectGenerated = $this->generateObject($typeName, $typeKind, $typeOfTypeDepth);
             }
 
             if ($objectGenerated) {
@@ -245,10 +252,11 @@ class SchemaClassGenerator
 
     /**
      * @param string $objectName
+     * @param int    $typeOfTypeDepth
      *
      * @return bool
      */
-    protected function generateUnionObject(string $objectName): bool
+    protected function generateUnionObject(string $objectName, int $typeOfTypeDepth = 4): bool
     {
         if (array_key_exists($objectName, $this->generatedObjects)) {
             return true;
@@ -261,7 +269,7 @@ class SchemaClassGenerator
         $objectBuilder = new UnionObjectBuilder($this->writeDir, $objectName, $this->generationNamespace);
 
         foreach ($objectArray['possibleTypes'] as $possibleType) {
-            $this->generateObject($possibleType['name'], $possibleType['kind']);
+            $this->generateObject($possibleType['name'], $possibleType['kind'], $typeOfTypeDepth);
             $objectBuilder->addPossibleType($possibleType['name']);
         }
         $objectBuilder->build();
@@ -272,10 +280,11 @@ class SchemaClassGenerator
     /**
      * @param string $argsObjectName
      * @param array  $arguments
+     * @param int    $typeOfTypeDepth
      *
      * @return bool
      */
-    protected function generateArgumentsObject(string $argsObjectName, array $arguments): bool
+    protected function generateArgumentsObject(string $argsObjectName, array $arguments, int $typeOfTypeDepth = 4): bool
     {
         if (array_key_exists($argsObjectName, $this->generatedObjects)) {
             return true;
@@ -293,7 +302,7 @@ class SchemaClassGenerator
 
             $objectGenerated = true;
             if ($typeKind !== FieldTypeKindEnum::SCALAR) {
-                $objectGenerated = $this->generateObject($typeName, $typeKind);
+                $objectGenerated = $this->generateObject($typeName, $typeKind, $typeOfTypeDepth);
             }
 
             if ($objectGenerated) {

@@ -3,6 +3,7 @@
 namespace GraphQL\SchemaGenerator;
 
 use GraphQL\Client;
+use GraphQL\SchemaGenerator\SchemaInspector\TypeSubQueryGenerator;
 
 /**
  * Class SchemaInspector
@@ -13,50 +14,51 @@ use GraphQL\Client;
  */
 class SchemaInspector
 {
-    private const TYPE_SUB_QUERY = <<<QUERY
-type{
-  name
-  kind
-  description
-  ofType{
-    name
-    kind
-    ofType{
-      name
-      kind
-      ofType{
-        name
-        kind
-        ofType{
-          name
-          kind
-        }
-      }
-    }
-  }
-}
-QUERY;
-
-
     /**
      * @var Client
      */
     protected $client;
 
     /**
-     * SchemaInspector constructor.
-     *
-     * @param Client $client
+     * @var TypeSubQueryGenerator
      */
-    public function __construct(Client $client)
-    {
-        $this->client = $client;
-    }
+    private $typeSubQueryGenerate;
+
 
     /**
+     * SchemaInspector constructor.
+     *
+     * @param Client                     $client
+     * @param TypeSubQueryGenerator|null $typeSubQueryGenerate Generator for oFType sub queries
+     */
+    public function __construct(Client $client, ?TypeSubQueryGenerator $typeSubQueryGenerate=null)
+    {
+        $this->client = $client;
+        $this->typeSubQueryGenerate = ($typeSubQueryGenerate ?? new TypeSubQueryGenerator());
+
+        // End __construct().
+    }
+
+
+    /**
+     * @param integer  $typeOfTypeDepth How deep it should go
+     *
+     * @return string
+     */
+    private function getTypeSubQuery(int $typeOfTypeDepth=4): string
+    {
+        return $this->typeSubQueryGenerate->getSubTypeQuery($typeOfTypeDepth);
+
+        // End getTypeSubQuery().
+    }
+
+
+    /**
+     * @param integer  $typeOfTypeDepth How deep it should go
+     *
      * @return array
      */
-    public function getQueryTypeSchema(): array
+    public function getQueryTypeSchema(int $typeOfTypeDepth=4): array
     {
         $schemaQuery = "{
   __schema{
@@ -69,12 +71,12 @@ QUERY;
         description
         isDeprecated
         deprecationReason
-        " . static::TYPE_SUB_QUERY . "
+        ".$this->getTypeSubQuery($typeOfTypeDepth)."
         args{
           name
           description
           defaultValue
-          " . static::TYPE_SUB_QUERY . "
+          ".$this->getTypeSubQuery($typeOfTypeDepth)."
         }
       }
     }
@@ -83,14 +85,18 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__schema']['queryType'];
+
+        // End getQueryTypeSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string   $objectName      The name of the object
+     * @param integer  $typeOfTypeDepth How deep it should go
      *
      * @return array
      */
-    public function getObjectSchema(string $objectName): array
+    public function getObjectSchema(string $objectName, int $typeOfTypeDepth=4): array
     {
         $schemaQuery = "{
   __type(name: \"$objectName\") {
@@ -101,12 +107,12 @@ QUERY;
       description
       isDeprecated
       deprecationReason
-      " . static::TYPE_SUB_QUERY . "
+      ".$this->getTypeSubQuery($typeOfTypeDepth)."
       args{
         name
         description
         defaultValue
-        " . static::TYPE_SUB_QUERY . "
+        ".$this->getTypeSubQuery($typeOfTypeDepth)."
       }
     }
   }
@@ -114,14 +120,18 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string   $objectName      The name of the object
+     * @param integer  $typeOfTypeDepth How deep it should go
      *
      * @return array
      */
-    public function getInputObjectSchema(string $objectName): array
+    public function getInputObjectSchema(string $objectName, int $typeOfTypeDepth=4): array
     {
         $schemaQuery = "{
   __type(name: \"$objectName\") {
@@ -131,17 +141,20 @@ QUERY;
       name
       description
       defaultValue
-      " . static::TYPE_SUB_QUERY . "
+      ".$this->getTypeSubQuery($typeOfTypeDepth)."
     }
   }
 }";
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getInputObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the object
      *
      * @return array
      */
@@ -160,10 +173,13 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getEnumObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the object
      *
      * @return array
      */
@@ -182,5 +198,9 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getUnionObjectSchema().
     }
+
+
 }

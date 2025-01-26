@@ -51,6 +51,13 @@ php vendor/bin/generate_schema_objects \
     --namespace "Vendor\Custom\Namespace"
 ```
 
+## Notes
+
+### Dealing with `PHP Fatal error:  Uncaught RuntimeException: Reached the limit of nesting in type info in ...SchemaGenerator\SchemaClassGenerator.php`
+You might encounter this error when the schema is deeply nested for the types.
+You can increase the depth of "type / ofType" by providing the `-D` option
+(or `--type-of-type-depth`) when running the command. The default value is 4.
+
 # Usage
 In all the examples below I'm going to use the super cool public Pokemon GraphQL API as an illustration.
 
