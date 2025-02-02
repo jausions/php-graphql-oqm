@@ -4,17 +4,28 @@
 use GraphQL\Client;
 use GraphQL\SchemaGenerator\CodeGenerator\ObjectBuilderInterface;
 use GraphQL\SchemaGenerator\SchemaClassGenerator;
+use GraphQL\SchemaGenerator\SchemaInspector\TypeSubQueryGenerator;
 
 $autoLoadFiles = [__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'];
 
-function readConfig()
+/**
+ * @return array{
+ *     0: string,
+ *     1: string,
+ *     2: array<string, string>,
+ *     3: string,
+ *     4: int,
+ * }
+ */
+function readConfig(): array
 {
     $shortOptions = implode("", [
         'u:',
         'h:',
         'v:',
         'd:',
-        'n:'
+        'n:',
+        'D:',
     ]);
 
     $longOptions = [
@@ -23,6 +34,7 @@ function readConfig()
         'authorization-header-value:',
         'directory:',
         'namespace:',
+        'type-of-type-depth:',
     ];
 
     $options = getopt($shortOptions, $longOptions);
@@ -32,6 +44,7 @@ function readConfig()
     $authHeaderName = $options['authorization-header-name'] ?? $options['h'] ?? readline('Authorization header name: ');
     $authHeaderValue = $options['authorization-header-value'] ?? $options['v'] ?? readline('Authorization header value: ');
     $namespace = $options['n'] ?? $options['namespace'] ?? trim(readline('Custom namespace (optional): '));
+    $typeOfTypeDepth = $options['type-of-type-depth'] ?? $options['D'] ?? 4;
 
     $authHeaders = [];
 
@@ -39,7 +52,13 @@ function readConfig()
         $authHeaders = [$authHeaderName => $authHeaderValue];
     }
 
-    return [$url, empty($customWriteDir) ? "" : $customWriteDir, $authHeaders, empty($namespace) ? ObjectBuilderInterface::DEFAULT_NAMESPACE : $namespace];
+    return [
+        $url,
+        empty($customWriteDir) ? "" : $customWriteDir,
+        $authHeaders,
+        empty($namespace) ? ObjectBuilderInterface::DEFAULT_NAMESPACE : $namespace,
+        $typeOfTypeDepth,
+    ];
 }
 
 // Require autoload.php depending on environment
@@ -55,13 +74,14 @@ if (!$autoLoadFound) {
 	throw new RuntimeException('Could not find vendor/autoload.php');
 }
 
-[$endpointUrl, $customWriteDir, $authHeaders, $namespace] = readConfig();
+[$endpointUrl, $customWriteDir, $authHeaders, $namespace, $typeOfTypeDepth] = readConfig();
 
 $client  = new Client($endpointUrl, $authHeaders);
-$scanner = new SchemaClassGenerator($client, $customWriteDir, $namespace);
+$scanner = new SchemaClassGenerator($client, $customWriteDir, $namespace, new TypeSubQueryGenerator($typeOfTypeDepth));
 
 print "-------------------------------------------\n";
 print "Generating schema objects from schema types\n";
+print "Using \"type / ofType\" depth: $typeOfTypeDepth\n";
 print "-------------------------------------------\n";
 
 $scanner->generateRootQueryObject();

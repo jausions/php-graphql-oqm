@@ -3,6 +3,7 @@
 namespace GraphQL\SchemaGenerator;
 
 use GraphQL\Client;
+use GraphQL\SchemaGenerator\SchemaInspector\TypeSubQueryGenerator;
 
 /**
  * Class SchemaInspector
@@ -13,30 +14,6 @@ use GraphQL\Client;
  */
 class SchemaInspector
 {
-    private const TYPE_SUB_QUERY = <<<QUERY
-type{
-  name
-  kind
-  description
-  ofType{
-    name
-    kind
-    ofType{
-      name
-      kind
-      ofType{
-        name
-        kind
-        ofType{
-          name
-          kind
-        }
-      }
-    }
-  }
-}
-QUERY;
-
 
     /**
      * @var Client
@@ -44,14 +21,36 @@ QUERY;
     protected $client;
 
     /**
+     * @var TypeSubQueryGenerator
+     */
+    private $typeSubQueryGenerate;
+
+
+    /**
      * SchemaInspector constructor.
      *
-     * @param Client $client
+     * @param Client                     $client
+     * @param TypeSubQueryGenerator|null $typeSubQueryGenerate Generator of sub queries for types
      */
-    public function __construct(Client $client)
+    public function __construct(Client $client, ?TypeSubQueryGenerator $typeSubQueryGenerate=null)
     {
         $this->client = $client;
+        $this->typeSubQueryGenerate = ($typeSubQueryGenerate ?? new TypeSubQueryGenerator(4));
+
+        // End __construct().
     }
+
+
+    /**
+     * @return string
+     */
+    private function getTypeSubQuery(): string
+    {
+        return $this->typeSubQueryGenerate->getSubTypeQuery();
+
+        // End getTypeSubQuery().
+    }
+
 
     /**
      * @return array
@@ -69,12 +68,12 @@ QUERY;
         description
         isDeprecated
         deprecationReason
-        " . static::TYPE_SUB_QUERY . "
+        ".$this->getTypeSubQuery()."
         args{
           name
           description
           defaultValue
-          " . static::TYPE_SUB_QUERY . "
+          ".$this->getTypeSubQuery()."
         }
       }
     }
@@ -83,10 +82,13 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__schema']['queryType'];
+
+        // End getQueryTypeSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the object
      *
      * @return array
      */
@@ -101,12 +103,12 @@ QUERY;
       description
       isDeprecated
       deprecationReason
-      " . static::TYPE_SUB_QUERY . "
+      ".$this->getTypeSubQuery()."
       args{
         name
         description
         defaultValue
-        " . static::TYPE_SUB_QUERY . "
+        ".$this->getTypeSubQuery()."
       }
     }
   }
@@ -114,10 +116,13 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the object
      *
      * @return array
      */
@@ -131,17 +136,20 @@ QUERY;
       name
       description
       defaultValue
-      " . static::TYPE_SUB_QUERY . "
+      ".$this->getTypeSubQuery()."
     }
   }
 }";
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getInputObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the enum object
      *
      * @return array
      */
@@ -160,10 +168,13 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getEnumObjectSchema().
     }
 
+
     /**
-     * @param string $objectName
+     * @param string  $objectName The name of the union object
      *
      * @return array
      */
@@ -182,5 +193,9 @@ QUERY;
         $response = $this->client->runRawQuery($schemaQuery, true);
 
         return $response->getData()['__type'];
+
+        // End getUnionObjectSchema().
     }
+
+
 }

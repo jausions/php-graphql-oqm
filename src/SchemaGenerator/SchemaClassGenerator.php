@@ -10,6 +10,7 @@ use GraphQL\SchemaGenerator\CodeGenerator\InputObjectClassBuilder;
 use GraphQL\SchemaGenerator\CodeGenerator\ObjectBuilderInterface;
 use GraphQL\SchemaGenerator\CodeGenerator\QueryObjectClassBuilder;
 use GraphQL\SchemaGenerator\CodeGenerator\UnionObjectBuilder;
+use GraphQL\SchemaGenerator\SchemaInspector\TypeSubQueryGenerator;
 use GraphQL\SchemaObject\QueryObject;
 use GraphQL\Util\StringLiteralFormatter;
 use RuntimeException;
@@ -49,13 +50,14 @@ class SchemaClassGenerator
     /**
      * SchemaClassGenerator constructor.
      *
-     * @param Client $client
-     * @param string $writeDir
-     * @param string $namespace
+     * @param Client                     $client
+     * @param string                     $writeDir
+     * @param string                     $namespace
+     * @param TypeSubQueryGenerator|null $typeSubQueryGenerate
      */
-	public function __construct(Client $client, string $writeDir = '', string $namespace = ObjectBuilderInterface::DEFAULT_NAMESPACE)
+	public function __construct(Client $client, string $writeDir = '', string $namespace = ObjectBuilderInterface::DEFAULT_NAMESPACE, ?TypeSubQueryGenerator $typeSubQueryGenerate = null)
     {
-        $this->schemaInspector     = new SchemaInspector($client);
+        $this->schemaInspector     = new SchemaInspector($client, $typeSubQueryGenerate ?? new TypeSubQueryGenerator(4));
         $this->generatedObjects    = [];
         $this->writeDir            = $writeDir;
         $this->generationNamespace = $namespace;
